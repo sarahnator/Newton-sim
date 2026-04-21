@@ -10,6 +10,11 @@ from .rigid_ramp_tower import (
     render_video as render_rigid_video,
     run_simulation as run_rigid_simulation,
 )
+from .rigid_ramp_cup import (
+    build_scene as build_rigid_cup_scene,
+    render_video as render_rigid_cup_video,
+    run_simulation as run_rigid_cup_simulation,
+)
 
 __all__ = [
     "build_scene",
@@ -20,4 +25,7 @@ __all__ = [
     "build_rigid_scene",
     "render_rigid_video",
     "run_rigid_simulation",
+    "build_rigid_cup_scene",
+    "render_rigid_cup_video",
+    "run_rigid_cup_simulation",
 ]

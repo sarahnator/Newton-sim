@@ -11,6 +11,7 @@ if str(SRC) not in sys.path:
 
 from npm_sim.materials import MATERIALS
 from npm_sim.ramp_tower import run_simulation as run_jelly_simulation
+from npm_sim.rigid_ramp_cup import run_simulation as run_rigid_cup_simulation
 from npm_sim.rigid_ramp_tower import run_simulation as run_rigid_simulation
 
 JELLY_VARIANT_WALL_COUNTS = {
@@ -26,7 +27,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--variant",
         type=str,
         default="jelly-domino",
-        choices=["jelly", "jelly-single", "jelly-domino", "rigid"],
+        choices=["jelly", "jelly-single", "jelly-domino", "rigid", "rigid-cup"],
         help="Simulation variant.",
     )
     parser.add_argument(
@@ -82,6 +83,16 @@ def main(argv: list[str] | None = None):
 
     if args.variant == "rigid":
         return run_rigid_simulation(
+            ball_material=args.ball_material,
+            cube_material=args.cube_material,
+            viewer=args.viewer,
+            num_frames=args.num_frames,
+            output_path=args.output_path,
+            device=args.device,
+        )
+
+    if args.variant == "rigid-cup":
+        return run_rigid_cup_simulation(
             ball_material=args.ball_material,
             cube_material=args.cube_material,
             viewer=args.viewer,

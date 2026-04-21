@@ -12,7 +12,7 @@ if str(SRC) not in sys.path:
 from npm_sim.materials import MATERIALS
 from npm_sim.ramp_tower import VIDEO_NUM_FRAMES as JELLY_VIDEO_NUM_FRAMES
 from npm_sim.ramp_tower import render_video as render_jelly_video
-from npm_sim.rigid_ramp_tower import VIDEO_NUM_FRAMES as RIGID_VIDEO_NUM_FRAMES
+from npm_sim.rigid_ramp_cup import render_video as render_rigid_cup_video
 from npm_sim.rigid_ramp_tower import render_video as render_rigid_video
 
 JELLY_VARIANT_WALL_COUNTS = {
@@ -28,7 +28,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--variant",
         type=str,
         default="jelly-domino",
-        choices=["jelly", "jelly-single", "jelly-domino", "rigid"],
+        choices=["jelly", "jelly-single", "jelly-domino", "rigid", "rigid-cup"],
         help="Simulation variant.",
     )
     parser.add_argument(
@@ -48,8 +48,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--num-frames",
         type=int,
-        default=JELLY_VIDEO_NUM_FRAMES,
-        help="Number of simulation frames to render into the video.",
+        default=None,
+        help="Number of simulation frames to render into the video. Uses a variant-specific default when omitted.",
     )
     parser.add_argument(
         "--output-path",
@@ -69,7 +69,16 @@ def create_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> Path:
     parser = create_parser()
     args = parser.parse_args(argv)
-    if args.num_frames <= 0:
+    default_num_frames = {
+        "jelly": JELLY_VIDEO_NUM_FRAMES,
+        "jelly-single": JELLY_VIDEO_NUM_FRAMES,
+        "jelly-domino": JELLY_VIDEO_NUM_FRAMES,
+        "rigid": JELLY_VIDEO_NUM_FRAMES,
+        "rigid-cup": JELLY_VIDEO_NUM_FRAMES,
+    }[args.variant]
+    num_frames = args.num_frames if args.num_frames is not None else default_num_frames
+
+    if num_frames <= 0:
         parser.error("--num-frames must be positive")
 
     if args.variant == "rigid":
@@ -77,7 +86,16 @@ def main(argv: list[str] | None = None) -> Path:
             output_path=args.output_path or "outputs/ramp_tower_rigid.mp4",
             ball_material=args.ball_material,
             cube_material=args.cube_material,
-            num_frames=args.num_frames,
+            num_frames=num_frames,
+            device=args.device,
+        )
+
+    if args.variant == "rigid-cup":
+        return render_rigid_cup_video(
+            output_path=args.output_path or "outputs/ramp_cup_rigid.mp4",
+            ball_material=args.ball_material,
+            cube_material=args.cube_material,
+            num_frames=num_frames,
             device=args.device,
         )
 
@@ -91,7 +109,7 @@ def main(argv: list[str] | None = None) -> Path:
         ball_material=args.ball_material,
         cube_material=args.cube_material,
         wall_count=JELLY_VARIANT_WALL_COUNTS[args.variant],
-        num_frames=args.num_frames,
+        num_frames=num_frames,
         device=args.device,
     )
 
