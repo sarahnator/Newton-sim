@@ -14,6 +14,11 @@ from npm_sim.ramp_tower import VIDEO_NUM_FRAMES as JELLY_VIDEO_NUM_FRAMES
 from npm_sim.ramp_tower import render_video as render_jelly_video
 from npm_sim.rigid_ramp_cup import render_video as render_rigid_cup_video
 from npm_sim.rigid_ramp_tower import render_video as render_rigid_video
+from npm_sim.roboarm_wall import FRICTION_MODE_HIGH, FRICTION_MODE_LOW
+from npm_sim.roboarm_wall import PUSH_MODE_CENTER, PUSH_MODE_HIGH, PUSH_MODE_LOW
+from npm_sim.roboarm_wall import VIDEO_NUM_FRAMES_BY_MODE as ROBOARM_WALL_VIDEO_NUM_FRAMES_BY_MODE
+from npm_sim.roboarm_wall import default_video_output_path as default_roboarm_wall_video_output_path
+from npm_sim.roboarm_wall import render_video as render_roboarm_wall_video
 
 JELLY_VARIANT_WALL_COUNTS = {
     "jelly": 2,
@@ -28,7 +33,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--variant",
         type=str,
         default="jelly-domino",
-        choices=["jelly", "jelly-single", "jelly-domino", "rigid", "rigid-cup"],
+        choices=["jelly", "jelly-single", "jelly-domino", "rigid", "rigid-cup", "roboarm-wall"],
         help="Simulation variant.",
     )
     parser.add_argument(
@@ -36,7 +41,7 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         default="steel",
         choices=sorted(MATERIALS),
-        help="Material preset for the moving ball.",
+        help="Material preset for the moving ball or robot pusher.",
     )
     parser.add_argument(
         "--cube-material",
@@ -63,6 +68,20 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional Warp device override, for example cpu or cuda:0.",
     )
+    parser.add_argument(
+        "--roboarm-push-height",
+        type=str,
+        default=PUSH_MODE_HIGH,
+        choices=[PUSH_MODE_HIGH, PUSH_MODE_LOW, PUSH_MODE_CENTER],
+        help="Contact height mode for the roboarm-wall variant.",
+    )
+    parser.add_argument(
+        "--roboarm-friction",
+        type=str,
+        default=None,
+        choices=[FRICTION_MODE_HIGH, FRICTION_MODE_LOW],
+        help="Required friction mode for the center-push roboarm-wall variant.",
+    )
     return parser
 
 
@@ -75,6 +94,7 @@ def main(argv: list[str] | None = None) -> Path:
         "jelly-domino": JELLY_VIDEO_NUM_FRAMES,
         "rigid": JELLY_VIDEO_NUM_FRAMES,
         "rigid-cup": JELLY_VIDEO_NUM_FRAMES,
+        "roboarm-wall": ROBOARM_WALL_VIDEO_NUM_FRAMES_BY_MODE[args.roboarm_push_height],
     }[args.variant]
     num_frames = args.num_frames if args.num_frames is not None else default_num_frames
 
@@ -95,6 +115,23 @@ def main(argv: list[str] | None = None) -> Path:
             output_path=args.output_path or "outputs/ramp_cup_rigid.mp4",
             ball_material=args.ball_material,
             cube_material=args.cube_material,
+            num_frames=num_frames,
+            device=args.device,
+        )
+
+    if args.variant == "roboarm-wall":
+        if args.roboarm_push_height == PUSH_MODE_CENTER:
+            if args.roboarm_friction is None:
+                parser.error("--roboarm-friction is required when --roboarm-push-height center")
+        elif args.roboarm_friction is not None:
+            parser.error("--roboarm-friction is only valid when --roboarm-push-height center")
+        default_output = default_roboarm_wall_video_output_path(args.roboarm_push_height, args.roboarm_friction)
+        return render_roboarm_wall_video(
+            output_path=args.output_path or default_output,
+            arm_material=args.ball_material,
+            wall_material=args.cube_material,
+            push_mode=args.roboarm_push_height,
+            friction_mode=args.roboarm_friction,
             num_frames=num_frames,
             device=args.device,
         )

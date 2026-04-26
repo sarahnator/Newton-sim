@@ -15,6 +15,11 @@ from .rigid_ramp_cup import (
     render_video as render_rigid_cup_video,
     run_simulation as run_rigid_cup_simulation,
 )
+from .roboarm_wall import (
+    build_scene as build_roboarm_wall_scene,
+    render_video as render_roboarm_wall_video,
+    run_simulation as run_roboarm_wall_simulation,
+)
 
 __all__ = [
     "build_scene",
@@ -28,4 +33,7 @@ __all__ = [
     "build_rigid_cup_scene",
     "render_rigid_cup_video",
     "run_rigid_cup_simulation",
+    "build_roboarm_wall_scene",
+    "render_roboarm_wall_video",
+    "run_roboarm_wall_simulation",
 ]
