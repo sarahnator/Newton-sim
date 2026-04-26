@@ -1,6 +1,6 @@
 # Newton-sim
 
-`Newton-sim` is a tiny Newton-on-Warp demo repo with six small passive 3D variants: a rigid-body ramp/floor/ball/tower scene, a rigid-body ramp/floor/ball/cup scene, a rigid-body ramp/floor/ball/cup/water scene using Genesis DFSPH water, a deformable jelly single-wall scene, a deformable jelly domino scene with two walls, and a Newton Franka/Panda robot arm whose end-effector accelerates straight into a wall at high or low contact height.
+`Newton-sim` is a tiny Newton-on-Warp demo repo with seven small 3D variants: a rigid-body ramp/floor/ball/tower scene, a rigid-body ramp/floor/ball/cup scene, a rigid-body ramp/floor/ball/cup/water scene using Genesis DFSPH water, a Genesis robot-arm water-pouring scene, a deformable jelly single-wall scene, a deformable jelly domino scene with two walls, and a Newton Franka/Panda robot arm whose end-effector accelerates straight into a wall at high or low contact height.
 
 ## Install
 
@@ -38,6 +38,12 @@ Rigid cup water variant:
 conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py
 ```
 
+Robot-arm pouring water between two glasses:
+
+```bash
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py
+```
+
 Robot-arm wall variant. The high and low modes use the same horizontal
 end-effector trajectory and only change the contact height:
 
@@ -66,6 +72,7 @@ python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height center --roboarm-friction high --output-path outputs/roboarm_wall_center_high_friction.mp4
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height center --roboarm-friction low --output-path outputs/roboarm_wall_center_low_friction.mp4
 conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py --output-path outputs/ramp_cup_water.mp4
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py --output-path outputs/robotic_arm_pour_genesis.mp4
 ```
 
 ## Headless Run
@@ -74,4 +81,4 @@ conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py --output-p
 python scripts/run_ramp_tower.py --viewer null --num-frames 180
 ```
 
-The repo currently contains only these six small variants.
+The repo currently contains only these small simulation variants.
