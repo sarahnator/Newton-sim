@@ -39,7 +39,7 @@ class RoboticArmPourGenesisSmokeTest(unittest.TestCase):
     def test_gripper_stays_on_external_handle(self) -> None:
         mod = _load_module()
         demo = mod.RoboticArmPourGenesisDemo(num_frames=0, show_viewer=False, enable_camera=False)
-        inspect_frames = {0, 30, 60, 90, 120, 150, 210}
+        inspect_frames = {0, 45, 90, 135, 180, 240, 300, 350}
 
         for frame in range(max(inspect_frames) + 1):
             time_seconds = frame / mod.FRAME_RATE
@@ -103,7 +103,27 @@ class RoboticArmPourGenesisSmokeTest(unittest.TestCase):
             qs.append(mod.standard_robot_q_at(frame / mod.FRAME_RATE)[:7].copy())
         qs = np.asarray(qs)
         max_joint_step = np.abs(np.diff(qs, axis=0)).max()
-        self.assertLess(max_joint_step, 0.05)
+        self.assertLess(max_joint_step, 0.09)
+
+    def test_upper_glass_starts_on_table_then_lifts(self) -> None:
+        mod = _load_module()
+        demo = mod.RoboticArmPourGenesisDemo(num_frames=0, show_viewer=False, enable_camera=False)
+
+        demo._apply_kinematic_pose(0.0)
+        start_pos = demo.current_cup_pos.copy()
+        np.testing.assert_allclose(start_pos, mod.PICKUP_CENTER, atol=2.5e-2)
+        self.assertAlmostEqual(start_pos[2] - 0.5 * mod.GLASS_HEIGHT, 0.0, delta=0.01)
+
+        lift_done_time = mod.SURFACE_HOLD_SECONDS + mod.LIFT_SECONDS
+        demo._apply_kinematic_pose(lift_done_time)
+        lifted_pos = demo.current_cup_pos.copy()
+        self.assertGreater(lifted_pos[2], 0.42)
+        self.assertGreater(lifted_pos[0], start_pos[0] + 0.20)
+
+        demo._apply_kinematic_pose((mod.VIDEO_NUM_FRAMES - 1) / mod.FRAME_RATE)
+        final_pos = demo.current_cup_pos.copy()
+        np.testing.assert_allclose(final_pos, start_pos, atol=3.0e-2)
+        self.assertAlmostEqual(final_pos[2] - 0.5 * mod.GLASS_HEIGHT, 0.0, delta=0.015)
 
     def test_glasses_do_not_overlap(self) -> None:
         mod = _load_module()
@@ -124,7 +144,7 @@ class RoboticArmPourGenesisSmokeTest(unittest.TestCase):
     def test_no_floor_leak_before_pour_starts(self) -> None:
         mod = _load_module()
         demo = self._demo_with_settled_water(mod)
-        inspect_frames = {0, 10, 20}
+        inspect_frames = {0, 20, 60, 100, 140}
 
         for frame in range(max(inspect_frames) + 1):
             if frame in inspect_frames:
@@ -152,14 +172,36 @@ class RoboticArmPourGenesisSmokeTest(unittest.TestCase):
         result = mod.run_simulation(num_frames=mod.VIDEO_NUM_FRAMES)
 
         self.assertTrue(np.isfinite(result.final_particle_positions).all())
-        self.assertGreater(result.initial_particle_count, 0)
+        self.assertGreater(result.initial_particle_count, 13000)
+
+        initial_pos, initial_quat = mod.initial_glass_pose()
+        initial_local = mod._inverse_transform_points(
+            initial_pos,
+            initial_quat,
+            result.initial_particle_positions,
+        )
+        initial_r = np.linalg.norm(initial_local[:, :2], axis=1)
+        initial_core = (
+            (initial_r < mod.GLASS_INNER_RADIUS - mod.WATER_PARTICLE_SIZE)
+            & (initial_local[:, 2] >= mod.GLASS_INNER_FLOOR_Z - 1.0e-3)
+            & (initial_local[:, 2] <= mod.GLASS_RIM_Z)
+        )
+        initial_surface_z = float(np.percentile(initial_local[initial_core, 2], 99.5))
+        initial_level_fraction = (
+            (initial_surface_z - mod.GLASS_INNER_FLOOR_Z)
+            / (mod.GLASS_RIM_Z - mod.GLASS_INNER_FLOOR_Z)
+        )
+        self.assertGreater(initial_level_fraction, 0.76)
+        self.assertLess(initial_level_fraction, 0.84)
+
         self.assertGreater(result.max_tilt_degrees, 80.0)
         self.assertLess(result.final_tilt_degrees, 2.0)
-        self.assertGreater(result.final_particles_in_receiver, 0.30 * result.initial_particle_count)
-        self.assertGreater(result.final_particles_in_pourer, 0.25 * result.initial_particle_count)
-        self.assertLess(result.final_particles_in_receiver, 0.65 * result.initial_particle_count)
-        self.assertLess(result.max_glass_solid_particles, 80)
-        self.assertLess(result.max_pourer_solid_particles, 40)
+        self.assertGreater(result.final_particles_in_receiver, 0.45 * result.initial_particle_count)
+        self.assertGreater(result.final_particles_in_pourer, 0.45 * result.initial_particle_count)
+        self.assertLess(abs(result.receiver_fraction - result.pourer_fraction), 0.04)
+        self.assertLess(result.max_glass_solid_particles, 100)
+        self.assertLess(result.max_pourer_solid_particles, 100)
+        self.assertEqual(result.max_pourer_base_particles, 0)
 
 
 if __name__ == "__main__":

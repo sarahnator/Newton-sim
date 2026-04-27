@@ -66,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         print("final tilt deg:   ", f"{result.final_tilt_degrees:.1f}")
         print("solid violations: ", result.max_glass_solid_particles)
         print("  upper glass:    ", result.max_pourer_solid_particles)
+        print("  upper base:     ", result.max_pourer_base_particles)
         print("  receiver glass: ", result.max_receiver_solid_particles)
         return 0
 
