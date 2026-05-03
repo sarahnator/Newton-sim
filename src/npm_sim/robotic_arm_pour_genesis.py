@@ -234,6 +234,40 @@ SETTLED_PARTICLES_CACHE = (
 GLASS_MESH_PATH = Path(__file__).resolve().parents[2] / "outputs" / "_genesis" / "pouring_glass.obj"
 SETTLE_BAKE_SECONDS = 0.8
 STASHED_PARTICLE_POS = np.array([10.0, 10.0, -10.0], dtype=np.float32)
+MEDIUM_VISCOSITY = 0.0055
+TARGET_VISCOSITY = 0.006
+
+
+def configure_target_variant() -> None:
+    """Configure this module for a synthetic unknown-viscosity target liquid."""
+    global WATER_VISCOSITY
+    global LIQUID_COLOR
+    global SETTLED_PARTICLES_CACHE
+
+    WATER_VISCOSITY = TARGET_VISCOSITY
+    LIQUID_COLOR = (0.40, 0.72, 0.68, 1.0)
+    SETTLED_PARTICLES_CACHE = (
+        Path(__file__).resolve().parents[2]
+        / "outputs"
+        / "_genesis"
+        / "robotic_arm_pickup_pour_target_mu0060_base050_p006_fill080_over1405_clear006_fric005_soft0015_pose080_slow_fillet012_micro084_sdf0025_align0_corrbase_settled.npy"
+    )
+
+
+def configure_medium_variant() -> None:
+    """Configure this module for a visible medium-viscosity reference liquid."""
+    global WATER_VISCOSITY
+    global LIQUID_COLOR
+    global SETTLED_PARTICLES_CACHE
+
+    WATER_VISCOSITY = MEDIUM_VISCOSITY
+    LIQUID_COLOR = (0.54, 0.45, 0.86, 1.0)
+    SETTLED_PARTICLES_CACHE = (
+        Path(__file__).resolve().parents[2]
+        / "outputs"
+        / "_genesis"
+        / "robotic_arm_pickup_pour_medium_mu0055_base050_p006_fill080_over1405_clear006_fric005_soft0015_pose080_slow_fillet012_micro084_sdf0025_align0_corrbase_settled.npy"
+    )
 
 
 def configure_honey_variant() -> None:

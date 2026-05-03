@@ -44,6 +44,18 @@ Robot-arm pouring water between two glasses:
 conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py
 ```
 
+Medium-viscosity reference pour between water and honey:
+
+```bash
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_medium_genesis.py
+```
+
+Synthetic target-liquid pour for viscosity-calibration demos:
+
+```bash
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_target_genesis.py
+```
+
 Robot-arm wall variant. The high and low modes use the same horizontal
 end-effector trajectory and only change the contact height:
 
@@ -73,7 +85,18 @@ python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height center --roboarm-friction low --output-path outputs/roboarm_wall_center_low_friction.mp4
 conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py --output-path outputs/ramp_cup_water.mp4
 conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py --output-path outputs/robotic_arm_pour_genesis.mp4
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_medium_genesis.py --output-path outputs/robotic_arm_pour_medium_genesis.mp4
+conda run -n genesis-sim python scripts/run_robotic_arm_pour_target_genesis.py --output-path outputs/robotic_arm_pour_target_genesis.mp4
 ```
+
+## Viscosity Calibration Demo
+
+```bash
+conda run -n genesis-sim python scripts/prepare_viscosity_calibration_demo.py
+```
+
+This runs a narrow log-space Bayesian optimization over the synthetic target
+liquid and writes presentation plots/tables to `outputs/calibration_demo/`.
 
 ## Headless Run
 
