@@ -12,11 +12,11 @@ from typing import Optional
 
 import numpy as np
 
-FRAME_RATE = 60
+FRAME_RATE = 120  # 60
 # 12 substeps puts effective SPH dt at ≈1.4 ms — inside the DFSPH CFL bound
 # for this particle size while keeping SPH-rigid coupling tight enough to
 # prevent particles tunnelling through thin cup walls between pressure solves.
-SIM_SUBSTEPS = 12
+SIM_SUBSTEPS = 6  # 12
 
 RAMP_ANGLE_DEG = 20.0
 RAMP_LENGTH = 1.25
@@ -49,6 +49,7 @@ WATER_PARTICLE_SIZE = 0.006
 WATER_DENSITY = 1000.0
 WATER_VISCOSITY = 1.0e-3
 WATER_BRIM_CLEARANCE = 0.006
+
 # Genesis SPH uses 0.8 * particle_size**3 as the per-particle rest volume, so
 # the emission cylinder sizing below targets
 # N_particles * 0.8 * ps**3 = TARGET_FILL_FRACTION * cavity_volume,
@@ -71,8 +72,15 @@ VIDEO_FPS = 60
 # Bake-and-reload cache for post-settle particle positions. Lets render_video
 # open frame 0 already at DFSPH equilibrium density, skipping the visible
 # ~0.25 s compression from regular-grid emission to rest density.
-SETTLED_PARTICLES_CACHE = Path(__file__).resolve().parents[2] / "outputs" / "_genesis" / "settled_water.npy"
+SETTLED_PARTICLES_CACHE = (
+    Path(__file__).resolve().parents[2]
+    / "outputs"
+    / "_genesis"
+    / "settled_water.npy"
+)
 SETTLE_BAKE_SECONDS = 0.8
+
+PRE_SETTLE_SECONDS = 0.0
 
 
 @dataclass(frozen=True)
@@ -81,8 +89,50 @@ class SimulationResult:
     final_ball_position: np.ndarray
     initial_cup_position: np.ndarray
     final_cup_position: np.ndarray
+    initial_cup_quat_wxyz: np.ndarray
+    final_cup_quat_wxyz: np.ndarray
+    max_cup_tilt_degrees: float
+    final_cup_tilt_degrees: float
     initial_particle_positions: np.ndarray
     final_particle_positions: np.ndarray
+
+
+def _quat_wxyz_to_matrix(q: np.ndarray) -> np.ndarray:
+    """Convert quaternion in Genesis/MuJoCo-style wxyz order to a rotation matrix."""
+    w, x, y, z = [float(v) for v in q]
+    return np.array(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ],
+        dtype=np.float64,
+    )
+
+
+def _cup_tilt_degrees_from_quat_wxyz(q: np.ndarray) -> float:
+    """
+    Tilt angle between cup local +z axis and world +z axis.
+
+    0 deg   = upright
+    90 deg  = lying on its side
+    180 deg = upside down
+    """
+    rot = _quat_wxyz_to_matrix(np.asarray(q, dtype=np.float64))
+    cup_up_world = rot @ np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    cos_tilt = float(np.clip(np.dot(cup_up_world, world_up), -1.0, 1.0))
+    return float(np.degrees(np.arccos(cos_tilt)))
+
+
+def cup_fell_over_from_tilt(max_tilt_degrees: float, threshold_degrees: float = 60.0) -> bool:
+    """
+    Geometric fall-over label.
+
+    A 60 degree threshold catches cases where the cup has clearly entered
+    a tipping/falling regime even if it has not fully settled on its side.
+    """
+    return float(max_tilt_degrees) >= threshold_degrees
 
 
 def _cup_mesh_path() -> Path:
@@ -107,15 +157,17 @@ def build_cup_mesh(path: Optional[Path] = None) -> Path:
     half_h = CUP_HEIGHT * 0.5
     base_z = -half_h
     rim_z = half_h
-    # 20 mm walls: thin enough to give a usable cavity, thick enough that the
-    # CoACD-decomposed SDF still contains SPH at 12 substeps.
+
     outer_r = 0.5 * (CUP_BOTTOM_RADIUS + CUP_TOP_RADIUS) + 0.004
     inner_r = outer_r - max(CUP_WALL_THICKNESS * 2.0, 0.02)
     inner_base_z = base_z + CUP_BASE_THICKNESS
 
     def _ring(radius: float, z: float) -> np.ndarray:
         angles = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
-        return np.stack([radius * np.cos(angles), radius * np.sin(angles), np.full(n, z)], axis=1)
+        return np.stack(
+            [radius * np.cos(angles), radius * np.sin(angles), np.full(n, z)],
+            axis=1,
+        )
 
     outer_bot = _ring(outer_r, base_z)
     outer_top = _ring(outer_r, rim_z)
@@ -124,22 +176,31 @@ def build_cup_mesh(path: Optional[Path] = None) -> Path:
     outer_base_ring = _ring(outer_r, base_z)
     inner_floor_ring = _ring(inner_r, inner_base_z)
 
-    verts = np.concatenate([outer_bot, outer_top, inner_bot, inner_top, outer_base_ring, inner_floor_ring], axis=0)
+    verts = np.concatenate(
+        [outer_bot, outer_top, inner_bot, inner_top, outer_base_ring, inner_floor_ring],
+        axis=0,
+    )
     off_ob, off_ot, off_ib, off_it, off_base, off_floor = 0, n, 2 * n, 3 * n, 4 * n, 5 * n
+
     base_centre_idx = verts.shape[0]
     verts = np.concatenate([verts, np.array([[0.0, 0.0, base_z]])], axis=0)
+
     inner_floor_centre_idx = verts.shape[0]
     verts = np.concatenate([verts, np.array([[0.0, 0.0, inner_base_z]])], axis=0)
 
     faces = []
     for i in range(n):
         j = (i + 1) % n
+
         faces.append([off_ob + i, off_ob + j, off_ot + j])
         faces.append([off_ob + i, off_ot + j, off_ot + i])
+
         faces.append([off_ib + i, off_it + j, off_ib + j])
         faces.append([off_ib + i, off_it + i, off_it + j])
+
         faces.append([off_ot + i, off_it + j, off_it + i])
         faces.append([off_ot + i, off_ot + j, off_it + j])
+
         faces.append([base_centre_idx, off_base + j, off_base + i])
         faces.append([inner_floor_centre_idx, off_floor + i, off_floor + j])
 
@@ -147,9 +208,6 @@ def build_cup_mesh(path: Optional[Path] = None) -> Path:
     mesh.fix_normals()
     mesh.export(path)
     return path
-
-
-PRE_SETTLE_SECONDS = 0.0
 
 
 class RampCupWaterGenesisDemo:
@@ -218,7 +276,11 @@ class RampCupWaterGenesisDemo:
 
         self.initial_ball_pos = self._ball_pos()
         self.initial_cup_pos = self._cup_pos()
+        self.initial_cup_quat_wxyz = self._cup_quat_wxyz()
         self.initial_particles = self._particle_positions()
+
+        initial_tilt = _cup_tilt_degrees_from_quat_wxyz(self.initial_cup_quat_wxyz)
+        self.max_cup_tilt_degrees = float(initial_tilt)
 
     def _add_static_geometry(self) -> None:
         gs = self.gs
@@ -257,12 +319,16 @@ class RampCupWaterGenesisDemo:
         cos_a, sin_a = math.cos(angle), math.sin(angle)
         ramp_half_length = RAMP_LENGTH * 0.5
         ramp_half_thickness = RAMP_THICKNESS * 0.5
+
         local_y = -ramp_half_length + BALL_START_MARGIN
         local_z = ramp_half_thickness + BALL_RADIUS + BALL_CLEARANCE
+
         ramp_centre_y = -ramp_half_length * cos_a - ramp_half_thickness * sin_a
         ramp_centre_z = ramp_half_length * sin_a - ramp_half_thickness * cos_a
+
         ball_y = local_y * cos_a + local_z * sin_a + ramp_centre_y
         ball_z = -local_y * sin_a + local_z * cos_a + ramp_centre_z
+
         self.ball = self.scene.add_entity(
             material=gs.materials.Rigid(rho=BALL_DENSITY),
             morph=gs.morphs.Sphere(
@@ -290,6 +356,7 @@ class RampCupWaterGenesisDemo:
             sdf_min_res=32,
             sdf_max_res=128,
         )
+
         cup_half_h = CUP_HEIGHT * 0.5
         self.cup = self.scene.add_entity(
             material=cup_material,
@@ -307,22 +374,25 @@ class RampCupWaterGenesisDemo:
 
     def _add_water(self) -> None:
         gs = self.gs
-        # Emission cylinder sized for the settled column (after DFSPH
-        # compresses the regular-grid sampling to rest density) to fill
-        # TARGET_FILL_FRACTION of the cup cavity. Any emission above the
-        # cup brim overflows during the bake and is trimmed before caching.
+
+        # Emission cylinder sized for the settled column after DFSPH compresses
+        # regular-grid sampling to rest density.
         outer_r = 0.5 * (CUP_BOTTOM_RADIUS + CUP_TOP_RADIUS) + 0.004
         inner_r = outer_r - max(CUP_WALL_THICKNESS * 2.0, 0.02)
+
         fill_bottom_z = CUP_BASE_THICKNESS + WATER_PARTICLE_SIZE
         cup_inner_height = CUP_HEIGHT - CUP_BASE_THICKNESS - WATER_BRIM_CLEARANCE - WATER_PARTICLE_SIZE
         target_settled_height = TARGET_FILL_FRACTION * cup_inner_height
-        target_settled_volume = math.pi * inner_r ** 2 * target_settled_height
-        rest_volume_per_particle = 0.8 * WATER_PARTICLE_SIZE ** 3
+        target_settled_volume = math.pi * inner_r**2 * target_settled_height
+
+        rest_volume_per_particle = 0.8 * WATER_PARTICLE_SIZE**3
         target_n_particles = target_settled_volume / rest_volume_per_particle
-        emission_volume = target_n_particles * EMISSION_OVERFILL_FACTOR * WATER_PARTICLE_SIZE ** 3
+        emission_volume = target_n_particles * EMISSION_OVERFILL_FACTOR * WATER_PARTICLE_SIZE**3
+
         cylinder_radius = max(inner_r - WATER_PARTICLE_SIZE, WATER_PARTICLE_SIZE)
-        height = emission_volume / (math.pi * cylinder_radius ** 2)
+        height = emission_volume / (math.pi * cylinder_radius**2)
         cylinder_centre_z = fill_bottom_z + height * 0.5
+
         self.water = self.scene.add_entity(
             material=gs.materials.SPH.Liquid(rho=WATER_DENSITY, mu=WATER_VISCOSITY),
             morph=gs.morphs.Cylinder(
@@ -346,6 +416,9 @@ class RampCupWaterGenesisDemo:
     def _cup_pos(self) -> np.ndarray:
         return self.cup.get_pos().cpu().numpy().reshape(-1).copy()
 
+    def _cup_quat_wxyz(self) -> np.ndarray:
+        return self.cup.get_quat().cpu().numpy().reshape(-1).copy()
+
     def _particle_positions(self) -> np.ndarray:
         return self.water.get_particles_pos().cpu().numpy().copy()
 
@@ -353,18 +426,25 @@ class RampCupWaterGenesisDemo:
         self.scene.step()
         self.sim_time += self.frame_dt
 
+        cup_quat = self._cup_quat_wxyz()
+        cup_tilt = _cup_tilt_degrees_from_quat_wxyz(cup_quat)
+        self.max_cup_tilt_degrees = max(self.max_cup_tilt_degrees, float(cup_tilt))
+
     def pre_settle(self, seconds: float = PRE_SETTLE_SECONDS) -> None:
         """Step the sim with the ball held kinematically at its start pose."""
         if self.ball is None or seconds <= 0:
             return
+
         ball_pos = self.ball.get_pos().cpu().numpy().reshape(-1).copy()
         ball_quat = self.ball.get_quat().cpu().numpy().reshape(-1).copy()
+
         n = int(round(seconds * FRAME_RATE))
         for _ in range(n):
             self.ball.set_pos(ball_pos)
             self.ball.set_quat(ball_quat)
             self.ball.zero_all_dofs_velocity()
             self.scene.step()
+
         self.ball.set_pos(ball_pos)
         self.ball.set_quat(ball_quat)
         self.ball.zero_all_dofs_velocity()
@@ -376,13 +456,21 @@ class RampCupWaterGenesisDemo:
         under the floor plane (out of camera view) with zero velocity.
         """
         positions = self._particle_positions()
+
         cup_xy = np.array([CUP_CENTER_X, CUP_CENTER_Y])
         outer_r = 0.5 * (CUP_BOTTOM_RADIUS + CUP_TOP_RADIUS) + 0.004
         inner_r = outer_r - max(CUP_WALL_THICKNESS * 2.0, 0.02)
+
         rim_z = CUP_HEIGHT - WATER_BRIM_CLEARANCE
         floor_z = CUP_BASE_THICKNESS - 0.001
+
         r_xy = np.linalg.norm(positions[:, :2] - cup_xy, axis=1)
-        in_cavity = (r_xy < inner_r) & (positions[:, 2] >= floor_z) & (positions[:, 2] <= rim_z)
+        in_cavity = (
+            (r_xy < inner_r)
+            & (positions[:, 2] >= floor_z)
+            & (positions[:, 2] <= rim_z)
+        )
+
         if int((~in_cavity).sum()) > 0:
             positions[~in_cavity] = np.array([10.0, 10.0, -10.0], dtype=positions.dtype)
             self.water.set_particles_pos(positions.astype(np.float32))
@@ -392,20 +480,22 @@ class RampCupWaterGenesisDemo:
         """Restore baked particle positions; return False on a stale cache.
 
         Cache is rejected if particle count differs, or if fewer than half of
-        the cached particles lie inside the current cup footprint (or in the
-        stashed zone from trim_overflow_particles). Otherwise a changed cup
-        position would silently load water floating outside the cup.
+        the cached particles lie inside the current cup footprint or in the
+        stashed zone from trim_overflow_particles.
         """
         if not path.exists():
             return False
+
         settled = np.load(path).astype(np.float32)
         if settled.shape[0] != self.water.n_particles:
             return False
 
         cup_xy = np.array([CUP_CENTER_X, CUP_CENTER_Y])
         outer_r = 0.5 * (CUP_BOTTOM_RADIUS + CUP_TOP_RADIUS) + 0.004
+
         in_footprint = np.linalg.norm(settled[:, :2] - cup_xy, axis=1) < outer_r
         stashed = settled[:, 2] < -0.05
+
         if int((in_footprint | stashed).sum()) < 0.5 * settled.shape[0]:
             return False
 
@@ -416,11 +506,19 @@ class RampCupWaterGenesisDemo:
     def run(self) -> SimulationResult:
         for _ in range(self.num_frames):
             self.step()
+
+        final_cup_quat = self._cup_quat_wxyz()
+        final_cup_tilt = _cup_tilt_degrees_from_quat_wxyz(final_cup_quat)
+
         return SimulationResult(
             initial_ball_position=self.initial_ball_pos,
             final_ball_position=self._ball_pos(),
             initial_cup_position=self.initial_cup_pos,
             final_cup_position=self._cup_pos(),
+            initial_cup_quat_wxyz=self.initial_cup_quat_wxyz,
+            final_cup_quat_wxyz=final_cup_quat,
+            max_cup_tilt_degrees=float(self.max_cup_tilt_degrees),
+            final_cup_tilt_degrees=float(final_cup_tilt),
             initial_particle_positions=self.initial_particles,
             final_particle_positions=self._particle_positions(),
         )
@@ -445,12 +543,15 @@ def bake_settled_particles(
     lets render_video open at the true equilibrium.
     """
     cache_path.parent.mkdir(parents=True, exist_ok=True)
+
     demo = RampCupWaterGenesisDemo(num_frames=0, show_viewer=False, enable_camera=False)
     demo.pre_settle(settle_seconds)
     demo.trim_overflow_particles()
+
     # Brief re-equilibration so the surface is smooth after stashing overflow.
     for _ in range(int(round(0.2 * FRAME_RATE))):
         demo.step()
+
     settled = demo._particle_positions().astype(np.float32)
     np.save(cache_path, settled)
     return cache_path
@@ -477,6 +578,7 @@ def render_video(
 
     demo = RampCupWaterGenesisDemo(num_frames=num_frames, show_viewer=False, enable_camera=True)
     assert demo.camera is not None
+
     if not demo.load_settled_particles(settled_cache):
         bake_settled_particles(cache_path=settled_cache)
         demo.load_settled_particles(settled_cache)

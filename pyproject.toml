@@ -9,6 +9,7 @@ description = "Minimal Newton rigid-body ramp and tower demo."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "google-genai>=1.0.0",
     "newton[examples]>=1.1.0",
 ]
 

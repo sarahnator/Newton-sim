@@ -13,11 +13,11 @@ from typing import Optional
 
 import numpy as np
 
-FRAME_RATE = 60
+FRAME_RATE = 120 #60
 # Drive the moving cup at the same cadence as the SPH-rigid coupling. Genesis
 # accepts external pose commands at scene-step granularity, so we expose the
 # former internal substeps as explicit Python microsteps.
-MICROSTEPS_PER_FRAME = 84
+MICROSTEPS_PER_FRAME = 42 #84
 VIDEO_DT = 1.0 / FRAME_RATE
 PHYSICS_DT = VIDEO_DT / MICROSTEPS_PER_FRAME
 SIM_SUBSTEPS = 1
