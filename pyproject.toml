@@ -7,11 +7,25 @@ name = "npm-sim"
 version = "0.1.0"
 description = "Minimal Newton rigid-body ramp and tower demo."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 dependencies = [
+    "torch==2.11.0+cu128",
+    "torchvision",
+    "torchaudio",
+    "genesis-world>=0.2.0",
     "google-genai>=1.0.0",
     "newton[examples]>=1.1.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
