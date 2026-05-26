@@ -5,7 +5,7 @@ Newton/Warp at top level and cannot be imported alongside Genesis. We therefore
 import the module directly by path and avoid ``npm_sim.__init__``.
 
 Typical usage:
-    conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py \\
+    uv run python scripts/run_ramp_cup_water_genesis.py \\
         --num-frames 240 --output-path outputs/rigid_ramp_cup_water_genesis.mp4
 """
 from __future__ import annotations

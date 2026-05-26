@@ -6,6 +6,7 @@ because Genesis cannot coexist with Newton/Warp in one process.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional

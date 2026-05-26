@@ -5,15 +5,15 @@ Generate a one-variable-at-a-time benchmark sweep for the Genesis ramp/ball/cup/
 Usage examples:
 
   # Dry-run manifest only
-  uv run python scripts/generate_ramp_cup_sweep.py \
+  uv run scripts/generate_ramp_cup_sweep.py \
     --sweep-param ball_density --dry-run
 
   # Generate no-video benchmark entries
-  uv run python scripts/generate_ramp_cup_sweep.py \
+  uv run  scripts/generate_ramp_cup_sweep.py \
     --sweep-param ball_density --no-video --num-frames 240
 
   # Generate MP4s + per-entry metadata
-  uv run python scripts/generate_ramp_cup_sweep.py \
+  uv run scripts/generate_ramp_cup_sweep.py \
     --sweep-param water_viscosity --num-frames 240
 
 Notes:

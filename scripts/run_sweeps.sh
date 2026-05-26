@@ -115,8 +115,7 @@ set -euo pipefail
 #   ./scripts/run_sweeps.sh \
 #     --sims ramp_cup robotic_pour \
 #     --params ramp_cup:water_viscosity robotic_pour:water_viscosity \
-#     --seeds 0 1 2
-#
+#     --seeds 0 
 # Example: one quick no-video smoke test for one parameter in each sim:
 #
 #   ./scripts/run_sweeps.sh \
@@ -149,7 +148,7 @@ set -euo pipefail
 #
 # After generating sweeps with videos, build the VLM prompt dataset with:
 #
-#   python scripts/build_vlm_prompt_dataset.py \
+#   uv run scripts/build_vlm_prompt_dataset.py \
 #     --datasets-root outputs/datasets \
 #     --output-root datasets/vlm_prompt_dataset
 #
@@ -168,7 +167,8 @@ QUICK=0
 
 # Defaults
 SIMS=("ramp_cup" "robotic_pour" "pendulum")
-SEEDS=(0 1 2)
+# SEEDS=(0 1 2)
+SEEDS=(0)
 
 # Optional per-simulation parameter overrides.
 # Empty means: run high-priority params for that simulation.
@@ -375,7 +375,7 @@ if contains_sim "ramp_cup"; then
 
     echo ""
     echo "[ramp-cup] sweeping ${param}"
-    uv run python scripts/generate_ramp_cup_sweep.py \
+    uv run scripts/generate_ramp_cup_sweep.py \
       --sweep-param "$param" \
       --values "$values" \
       --seeds "${SEEDS[@]}" \
@@ -422,7 +422,7 @@ if contains_sim "robotic_pour"; then
 
     echo ""
     echo "[robotic-pour] sweeping ${param}"
-    uv run python scripts/generate_robotic_pour_sweep.py \
+    uv run scripts/generate_robotic_pour_sweep.py \
       --sweep-param "$param" \
       --values "$values" \
       --seeds "${SEEDS[@]}" \

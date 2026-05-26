@@ -4,7 +4,7 @@ Run from the ``genesis-sim`` conda env. The module is imported directly by
 path so this script does not import ``npm_sim.__init__`` and pull in Newton.
 
 Typical usage:
-    conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py \\
+    uv run python scripts/run_robotic_arm_pour_genesis.py \
         --output-path outputs/robotic_arm_pour_genesis.mp4
 """
 from __future__ import annotations

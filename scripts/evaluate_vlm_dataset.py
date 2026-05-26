@@ -284,6 +284,25 @@ def score_prediction(entry: dict[str, Any], pred: dict[str, Any]) -> dict[str, A
 
     query_type = entry.get("query_type", "")
 
+    if query_type == "pairwise_counterfactual" or metric == "pairwise_accuracy":
+        gt_choice = str(gt).strip().upper()
+        pred_choice = str(pred_value).strip().upper()
+
+        # Allow models to answer "Scenario A" or "A".
+        if "A" in pred_choice and "B" not in pred_choice:
+            pred_choice = "A"
+        elif "B" in pred_choice and "A" not in pred_choice:
+            pred_choice = "B"
+        elif "TIE" in pred_choice or "SAME" in pred_choice:
+            pred_choice = "TIE"
+
+        return {
+            "score_type": "pairwise_accuracy",
+            "correct": pred_choice == gt_choice,
+            "gt_normalized": gt_choice,
+            "pred_normalized": pred_choice,
+        }
+
     if query_type in {"binary_outcome", "conceptual_binary"} or metric == "binary_accuracy":
         gt_bool = normalize_bool(gt)
         pred_bool = normalize_bool(pred_value)
@@ -765,10 +784,11 @@ def parse_args() -> argparse.Namespace:
 
     # Gemini.
     # parser.add_argument("--gemini-model", type=str, default="gemini-2.5-pro")
-    parser.add_argument("--gemini-model", type=str, default="gemini-2.0-flash")
+    # parser.add_argument("--gemini-model", type=str, default="gemini-2.0-flash")
+    parser.add_argument("--gemini-model", type=str, default="gemini-2.5-flash")
     # parser.add_argument("--gemini-model", type=str, default="gemini-2.0-pro-exp-02-05")
     parser.add_argument("--gemini-api-key-env", type=str, default="GEMINI_API_KEY")
-    parser.add_argument("--sleep-seconds", type=float, default=4.0)
+    parser.add_argument("--sleep-seconds", type=float, default=3.0)
 
     # Diffusion / LTX.
     parser.add_argument("--ltx-root", type=Path, default=Path("."))

@@ -2,8 +2,12 @@ Metadata-Version: 2.4
 Name: npm-sim
 Version: 0.1.0
 Summary: Minimal Newton rigid-body ramp and tower demo.
-Requires-Python: >=3.10
+Requires-Python: <3.13,>=3.12
 Description-Content-Type: text/markdown
+Requires-Dist: torch==2.11.0+cu128
+Requires-Dist: torchvision
+Requires-Dist: torchaudio
+Requires-Dist: genesis-world==0.4.6
 Requires-Dist: google-genai>=1.0.0
 Requires-Dist: newton[examples]>=1.1.0
 
@@ -44,25 +48,25 @@ python scripts/run_ramp_tower.py --variant rigid-cup --viewer gl
 Rigid cup water variant:
 
 ```bash
-conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py
+uv run python scripts/run_ramp_cup_water_genesis.py
 ```
 
 Robot-arm pouring water between two glasses:
 
 ```bash
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py
+uv run python scripts/run_robotic_arm_pour_genesis.py
 ```
 
 Medium-viscosity reference pour between water and honey:
 
 ```bash
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_medium_genesis.py
+uv run python scripts/run_robotic_arm_pour_medium_genesis.py
 ```
 
 Synthetic target-liquid pour for viscosity-calibration demos:
 
 ```bash
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_target_genesis.py
+uv run python scripts/run_robotic_arm_pour_target_genesis.py
 ```
 
 Robot-arm wall variant. The high and low modes use the same horizontal
@@ -92,16 +96,16 @@ python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height low --output-path outputs/roboarm_wall_low.mp4
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height center --roboarm-friction high --output-path outputs/roboarm_wall_center_high_friction.mp4
 python scripts/render_ramp_tower_video.py --variant roboarm-wall --roboarm-push-height center --roboarm-friction low --output-path outputs/roboarm_wall_center_low_friction.mp4
-conda run -n genesis-sim python scripts/run_ramp_cup_water_genesis.py --output-path outputs/ramp_cup_water.mp4
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_genesis.py --output-path outputs/robotic_arm_pour_genesis.mp4
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_medium_genesis.py --output-path outputs/robotic_arm_pour_medium_genesis.mp4
-conda run -n genesis-sim python scripts/run_robotic_arm_pour_target_genesis.py --output-path outputs/robotic_arm_pour_target_genesis.mp4
+uv run python scripts/run_ramp_cup_water_genesis.py --output-path outputs/ramp_cup_water.mp4
+uv run python scripts/run_robotic_arm_pour_genesis.py --output-path outputs/robotic_arm_pour_genesis.mp4
+uv run python scripts/run_robotic_arm_pour_medium_genesis.py --output-path outputs/robotic_arm_pour_medium_genesis.mp4
+uv run python scripts/run_robotic_arm_pour_target_genesis.py --output-path outputs/robotic_arm_pour_target_genesis.mp4
 ```
 
 ## Viscosity Calibration Demo
 
 ```bash
-conda run -n genesis-sim python scripts/prepare_viscosity_calibration_demo.py
+uv run python scripts/prepare_viscosity_calibration_demo.py
 ```
 
 This runs a narrow log-space Bayesian optimization over the synthetic target
