@@ -12,7 +12,7 @@ dependencies = [
     "torch==2.11.0+cu128",
     "torchvision",
     "torchaudio",
-    "genesis-world>=0.2.0",
+    "genesis-world==0.4.6",
     "google-genai>=1.0.0",
     "newton[examples]>=1.1.0",
 ]
